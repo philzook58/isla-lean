@@ -9,6 +9,7 @@ checked against a Python byte reference. Requires riscv64-linux-gnu-gcc, qemu-ri
 
 from __future__ import annotations
 
+import os
 import pathlib
 import random
 import shutil
@@ -27,7 +28,7 @@ MODULES = {"inc64": "Increment", "umax64": "Maximum", "count64": "Count", "scan6
 
 def run(args, data=None, cwd=ROOT, cap=False):
     """Run a command; `cap` puts it in a memory-capped systemd scope when available."""
-    if cap and shutil.which("systemd-run"):
+    if cap and shutil.which("systemd-run") and not os.environ.get("CI"):
         args = ["systemd-run", "--user", "--scope", "-q", "-p", "MemoryMax=3G",
                 "-p", "MemorySwapMax=0", *args]
     result = subprocess.run(list(map(str, args)), cwd=cwd, input=data, text=True,

@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      # Replays the checked-in Isla traces: no Isla or Sail IR needed.
+      - run: uv run --group dev pytest
+
+  lean:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: lean
+      - name: Install the RISC-V cross compiler and qemu-user
+        run: sudo apt-get update && sudo apt-get install -y gcc-riscv64-linux-gnu qemu-user
+      # The exact example bytes under qemu against the lifted Lean models.
+      - run: python3 -I tests/check_native.py

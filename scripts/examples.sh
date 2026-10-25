@@ -2,12 +2,13 @@
 # Assemble the example routines, lift them through Isla, and check the Lean proofs.
 #   ISLA_LEAN_ARCH=/path/to/rv64d.ir scripts/examples.sh          # live Isla (sail_graham isla-snapshots/rv64d.ir)
 #   scripts/examples.sh --traces tests/fixtures/traces           # replay checked-in traces
-# Lean runs in a memory-capped systemd scope (MEMORY_MAX, default 3G) when systemd-run exists.
+# Lean runs in a memory-capped systemd scope (MEMORY_MAX, default 3G) when systemd-run exists
+# and $CI is unset (CI runners have no user systemd session).
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 cap() {
-  if command -v systemd-run >/dev/null; then
+  if command -v systemd-run >/dev/null && [ -z "$CI" ]; then
     systemd-run --user --scope -q -p MemoryMax="${MEMORY_MAX:-3G}" -p MemorySwapMax=0 "$@"
   else
     "$@"
