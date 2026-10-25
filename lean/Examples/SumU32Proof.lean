@@ -13,9 +13,6 @@ set_option experimental.vcgen true
 
 namespace IslaExamples.SumU32Proof
 
-/-- A 64-bit register holding a sign-extended 32-bit value, as the psABI passes `uint32_t`. -/
-def Canonical32 (x : BitVec 64) : Prop := x.toNat < 2 ^ 31 ∨ 2 ^ 64 - 2 ^ 31 ≤ x.toNat
-
 def wordSum (mem : Memory) (p : BitVec 64) : Nat → BitVec 32
   | 0 => 0
   | k + 1 => readLE mem p 4 + wordSum mem (p + 4) k
@@ -29,23 +26,14 @@ def Post (s : RVState) : Exit → Prop
 
 def Pre (s : RVState) : Prop := RamWords s.x10 4 (count s) ∧ Canonical32 s.x11
 
-private theorem ret_aligned (x : BitVec 64) :
-    BitVec.extractLsb 0 0 (x &&& 0xfffffffffffffffe#64) = 0#1 := by
-  ext i hi
-  have : i = 0 := by omega
-  subst this
-  simp
-
 private theorem wordSum_pos (mem : Memory) (p : BitVec 64) (k : Nat) (h : 0 < k) :
     wordSum mem p k = readLE mem p 4 + wordSum mem (p + 4) (k - 1) := by
   cases k with
   | zero => omega
   | succ k => rfl
 
-/-- The accumulator is `a0`'s low word; `addw` keeps `a0` its sign extension. -/
 def acc (f : SumU32O2.Frame) : BitVec 32 := BitVec.extractLsb 31 0 f.2.x10
 
-/-- Words left between the cursor `a5` and the end pointer `a1`. -/
 def rem (f : SumU32O2.Frame) : Nat := (f.2.x11.toNat - f.2.x15.toNat) / 4
 
 private def invariant (s : RVState) (f : SumU32O2.Frame) : Prop :=

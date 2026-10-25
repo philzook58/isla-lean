@@ -16,13 +16,6 @@ def Post (s : RVState) : Exit → Prop
       out.pc = s.x1 &&& ~~~1 ∧ out.x1 = s.x1 ∧ out.x2 = s.x2 ∧ out.mem = s.mem
   | .stuck _ => False
 
-private theorem ret_aligned (x : BitVec 64) :
-    BitVec.extractLsb 0 0 (x &&& 0xfffffffffffffffe#64) = 0#1 := by
-  ext i hi
-  have : i = 0 := by omega
-  subst this
-  simp
-
 private theorem or_bits (x y : BitVec 64) (hx : x.toNat ≤ 1) (hy : y.toNat ≤ 1) :
     (x ||| y).toNat = max x.toNat y.toNat := by
   rw [BitVec.toNat_or]

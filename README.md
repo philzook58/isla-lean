@@ -197,8 +197,9 @@ Proved against the C semantics, for every input (`lean/Examples/`):
 | --- | --- | --- |
 | `sum_u32` `-O2` | `SumU32Proof.correct` | `a0` = (Σ `a[i]` mod 2^32) sign-extended, for every `n` |
 | `copy_bytes` `-O2` | `CopyBytesProof.correct` | memory = the C loop's byte-by-byte copy, overlapping buffers included; returns `n` |
+| `find_u32` `-O2` | `FindU32Proof.correct` (cut points) | the first `i < n` with `a[i] = key`, or `n` |
 
-These proofs check in 3 s and 5 s respectively.
+These proofs check in 3, 5 and 10 s respectively.
 
 What compiled code adds, compared with hand-written assembly:
 - **Relocations.** RISC-V objects keep even intra-function branches relocatable (linker
@@ -218,6 +219,48 @@ What compiled code adds, compared with hand-written assembly:
 - **Speed.** Each instruction costs two Isla runs (about 5 s, 10–15 s for memory accesses), and the
   model reloads each time. `--jobs` parallelizes across instructions. Linking at a new address
   re-lifts everything, because traces are keyed by `opcode@pc`.
+
+## Writing proofs
+
+There are two styles. Both use `vcgen` on the generated `step`.
+- **Per-instruction invariants** (`run_spec`, as in pcode-lean): one clause per PC. All of the
+  pcode-lean ports use this style.
+- **Cut points** (`IslaLean/Cut.lean`, used by `FindU32Proof`):
+  - state the invariant only at entry and loop heads, and prove the run with `run_cuts`;
+  - `walk step, cut` executes everything between cut points;
+  - `walk … using tac` also tries `tac` on each new goal, so a load's non-RAM branches are closed
+    as they appear instead of being walked.
+
+  A cut-style `count64` needs a two-clause invariant and a six-line proof:
+  ```lean
+  apply run_cuts _ cut (I s) _ _ _ (by simp [I, Count.initial])
+  intro ⟨pc, state⟩ h; refine ⟨10, ?_⟩
+  cases pc <;> simp only [I] at h
+  all_goals walk Count.step, cut
+  all_goals simp_all [I, Returns]
+  all_goals bv_omega
+  ```
+
+Termination is proved with `IslaLean/Rank.lean`: a second triple per block says a rank decreases.
+
+`IslaLean/Memory.lean` collects the shared lemmas:
+- the platform-guard normalizers (128-bit `sle`/`slt`/`srem` → `Nat`);
+- `RamWords` and `RamRegion`;
+- `ret_aligned`;
+- the ABI helpers: `Canonical32`, `canonical_signExtend`, `canonical_ofNat`, `signExtend_inj`;
+- `cursor_eq`;
+- literal-form variants such as `sub1_add1`.
+
+Pitfalls that cost the most time:
+- **Literal spellings.** Generated code writes `4#64`, while specs write `4`. `rw` treats them as
+  different; `simp`/`simpa` normalise them.
+- **Self-referential facts loop `simp_all`.** For example `x = signExtend (low x)`, or
+  `canonical_ofNat`. Orient them so the right-hand side is smaller, or introduce them only after
+  walking.
+- **Hypothesis names.** `simp_all` may split a named hypothesis into anonymous ones. Destructure
+  the cut-point hypothesis *before* `walk`, and fetch branch conditions by their exact type.
+- **32-bit C types.** Indexes and keys live sign-extended in 64-bit registers. `Canonical32`
+  premises and the ABI helpers turn those comparisons into `Nat` facts for `omega`.
 
 ## Trust base and limits
 

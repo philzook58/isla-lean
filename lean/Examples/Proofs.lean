@@ -2,6 +2,7 @@ import Examples.Generated.Increment
 import Examples.Generated.Maximum
 import Examples.Generated.Count
 import IslaLean.Rank
+import IslaLean.Memory
 
 /-! Contracts for the RISC-V ports of pcode-lean's first examples, over Lean emitted from Isla
 footprints of the Sail model. The proof shape follows `pcode-lean/Examples/Proofs.lean`. -/
@@ -10,7 +11,6 @@ set_option experimental.vcgen true
 
 namespace IslaExamples
 
-/-- Result in `a0`, return to `ra` with its low bit cleared, `ra` and `sp` preserved. -/
 def Returns (before : RVState) (result : BitVec 64) : Exit → Prop
   | .ret after => after.x10 = result ∧ after.pc = before.x1 &&& ~~~1 ∧
       after.x1 = before.x1 ∧ after.x2 = before.x2
@@ -18,14 +18,6 @@ def Returns (before : RVState) (result : BitVec 64) : Exit → Prop
 
 private def frame (before after : RVState) : Prop :=
   after.x1 = before.x1 ∧ after.x2 = before.x2
-
-/-- The `jalr` alignment assertion always holds once bit 0 is cleared (simp normal form). -/
-private theorem ret_aligned (x : BitVec 64) :
-    BitVec.extractLsb 0 0 (x &&& 0xfffffffffffffffe#64) = 0#1 := by
-  ext i hi
-  have : i = 0 := by omega
-  subst this
-  simp
 
 namespace IncrementProof
 
@@ -51,37 +43,20 @@ end IncrementProof
 
 namespace MaximumProof
 
-def result (s : RVState) : BitVec 64 := if s.x10.ult s.x11 then s.x11 else s.x10
-
-/-- Sail states `bgeu` as a signed comparison of 128-bit zero extensions. Proved without
-`bv_decide`, whose certificate check would add a native-evaluation axiom. -/
-private theorem bgeu_iff (a b : BitVec 64) :
-    ((b.zeroExtend 128).sle (a.zeroExtend 128)) = !(a.ult b) := by
-  have ha : a.toNat < 2 ^ 64 := a.isLt
-  have hb : b.toNat < 2 ^ 64 := b.isLt
-  have hza : (a.zeroExtend 128).toInt = a.toNat := by
-    rw [BitVec.toInt_eq_toNat_of_msb]
-    · simp; omega
-    · simp [BitVec.msb_eq_getLsbD_last]
-  have hzb : (b.zeroExtend 128).toInt = b.toNat := by
-    rw [BitVec.toInt_eq_toNat_of_msb]
-    · simp; omega
-    · simp [BitVec.msb_eq_getLsbD_last]
-  rw [Bool.eq_iff_iff, BitVec.sle_iff_toInt_le, hza, hzb]
-  simp [BitVec.ult]
+def result (s : RVState) : BitVec 64 := if s.x10.toNat < s.x11.toNat then s.x11 else s.x10
 
 private def invariant (s : RVState) (f : Maximum.Frame) : Prop :=
   frame s f.2 ∧ f.2.x11 = s.x11 ∧ match f.1 with
     | .p0 => f.2.x10 = s.x10
-    | .p1 => s.x10.ult s.x11
+    | .p1 => s.x10.toNat < s.x11.toNat
     | .p2 => f.2.x10 = result s
 
 private theorem block (s : RVState) (f : Maximum.Frame) :
     ⦃invariant s f⦄ Maximum.step f ⦃Sum.elim (invariant s) (Returns s (result s))⦄ := by
   rcases f with ⟨pc, state⟩
   cases pc <;> vcgen [Maximum.step]
-  all_goals simp_all [invariant, frame, Returns, Sum.elim, result, bgeu_iff,
-    ret_aligned]
+  all_goals simp_all [invariant, frame, Returns, Sum.elim, result]
+  all_goals omega
 
 theorem correct (s : RVState) :
     ⦃True⦄ Maximum.run s ⦃Returns s (result s)⦄ := by
@@ -173,8 +148,8 @@ theorem MaximumProof.terminates (s : RVState) :
     ∃ out, Maximum.execute 3 s = some out ∧ Returns s (MaximumProof.result s) out := by
   apply finishes_execute Maximum.step (Maximum.initial s)
   simp [finishes, Maximum.step, Maximum.initial, Returns, Sum.elim, pure, ret_aligned,
-    MaximumProof.result, bgeu_iff]
-  split <;> simp_all
+    MaximumProof.result]
+  split <;> split <;> simp_all <;> omega
 
 /-! Concrete runs of the same generated step functions. -/
 def returned : Option Exit → Option (BitVec 64 × BitVec 64)

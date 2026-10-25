@@ -99,6 +99,62 @@ theorem eq_zero_iff_toNat (x : BitVec 64) : x = 0#64 ↔ x.toNat = 0 := by
   · intro h; simp [h]
   · intro h; apply BitVec.eq_of_toNat_eq; simpa using h
 
+/-- The `jalr` alignment assertion of `ret` always holds once bit 0 is cleared. -/
+@[simp] theorem ret_aligned (x : BitVec 64) :
+    BitVec.extractLsb 0 0 (x &&& 0xfffffffffffffffe#64) = 0#1 := by
+  ext i hi
+  have : i = 0 := by omega
+  subst this
+  simp
+
+/-- A 64-bit register holding a sign-extended 32-bit value, as the psABI passes `uint32_t`. -/
+def Canonical32 (x : BitVec 64) : Prop := x.toNat < 2 ^ 31 ∨ 2 ^ 64 - 2 ^ 31 ≤ x.toNat
+
+theorem canonical_signExtend (x : BitVec 64) (h : Canonical32 x) :
+    (BitVec.extractLsb 31 0 x).signExtend 64 = x := by
+  unfold Canonical32 at h
+  apply BitVec.eq_of_toNat_eq
+  have hx := x.isLt
+  have hlow : (BitVec.extractLsb 31 0 x).toNat = x.toNat % 2 ^ 32 := by
+    simp [BitVec.extractLsb_toNat]
+  rw [BitVec.toNat_signExtend, BitVec.msb_eq_decide, BitVec.toNat_setWidth, hlow]
+  split <;> simp_all <;> omega
+
+theorem signExtend_inj {a b : BitVec 32} (h : a.signExtend 64 = b.signExtend 64) : a = b := by
+  simpa using congrArg (BitVec.extractLsb 31 0) h
+
+/-- A canonical register is its low 32 bits, as a number, sign-extended. -/
+theorem canonical_ofNat (x : BitVec 64) (h : Canonical32 x) :
+    x = (BitVec.ofNat 32 (x.toNat % 2 ^ 32)).signExtend 64 := by
+  conv => lhs; rw [← canonical_signExtend x h]
+  congr 1
+  apply BitVec.eq_of_toNat_eq; simp [BitVec.extractLsb_toNat]
+
+theorem signExtend_ofNat_inj {a b : Nat} (ha : a < 2 ^ 32) (hb : b < 2 ^ 32)
+    (h : (BitVec.ofNat 32 a).signExtend 64 = (BitVec.ofNat 32 b).signExtend 64) : a = b := by
+  have := congrArg BitVec.toNat (signExtend_inj h)
+  simp at this; omega
+
+theorem ofNat32_succ (i : Nat) (h : i + 1 < 2 ^ 32) :
+    BitVec.ofNat 32 i + 1#32 = BitVec.ofNat 32 (i + 1) := by
+  apply BitVec.eq_of_toNat_eq; simp
+
+/-- A cursor `x` that is `4 * i` bytes past `b`, with no wraparound. -/
+theorem cursor_eq (b x : BitVec 64) (hle : b.toNat ≤ x.toNat) (hm : (x.toNat - b.toNat) % 4 = 0) :
+    b + BitVec.ofNat 64 (4 * ((x.toNat - b.toNat) / 4)) = x := by
+  apply BitVec.eq_of_toNat_eq
+  have := x.isLt
+  rw [BitVec.toNat_add, BitVec.toNat_ofNat]
+  omega
+
+/-- Decrementing a nonzero counter. -/
+theorem toNat_sub_one (x : BitVec 64) (h : 0 < x.toNat) : (x - 1#64).toNat = x.toNat - 1 := by
+  rw [BitVec.toNat_sub]; simp; omega
+
+/-- Generated code writes `1#64`; specs write `1`. -/
+theorem sub1_add1 (x : BitVec 64) : x - 1#64 + 1 = x := BitVec.sub_add_cancel x 1
+theorem add1_sub1 (x : BitVec 64) : x + 1#64 - 1 = x := BitVec.add_sub_cancel x 1
+
 /-- `n` consecutive 8-byte limbs at `p`, all 8-aligned and inside the platform's RAM window
 `[0x80000000, 0x100000000)`. -/
 def RamRegion (p : BitVec 64) (n : Nat) : Prop :=
@@ -108,5 +164,10 @@ def RamRegion (p : BitVec 64) (n : Nat) : Prop :=
 (`width = 1`) need no alignment. -/
 def RamWords (p : BitVec 64) (width n : Nat) : Prop :=
   0x80000000 ≤ p.toNat ∧ p.toNat + width * n ≤ 0x100000000 ∧ p.toNat % width = 0
+
+theorem RamRegion.next (h : RamRegion p n) (hn : 0 < n) : RamRegion (p + 8#64) (n - 1) := by
+  unfold RamRegion at *
+  rw [BitVec.toNat_add]; simp
+  omega
 
 end IslaLean

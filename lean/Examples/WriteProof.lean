@@ -12,13 +12,6 @@ set_option experimental.vcgen true
 
 namespace IslaExamples.WriteProof
 
-private theorem ret_aligned (x : BitVec 64) :
-    BitVec.extractLsb 0 0 (x &&& 0xfffffffffffffffe#64) = 0#1 := by
-  ext i hi
-  have : i = 0 := by omega
-  subst this
-  simp
-
 /-! ## `addmem`: two-limb add of buffers `a1` and `a2` into `a0`, returning the carry. -/
 
 def carryBit (b : Bool) : BitVec 64 := if b then 1 else 0

@@ -25,14 +25,6 @@ private theorem limbOr_pos (mem : Memory) (base : BitVec 64) (n : Nat) (h : 0 < 
   | zero => omega
   | succ n => rfl
 
-private theorem sub_one (x : BitVec 64) (h : 0 < x.toNat) : (x - 1#64).toNat = x.toNat - 1 := by
-  rw [BitVec.toNat_sub]; simp; omega
-
-private theorem RamRegion.next (h : RamRegion p n) (hn : 0 < n) : RamRegion (p + 8#64) (n - 1) := by
-  unfold RamRegion at *
-  rw [BitVec.toNat_add]; simp
-  omega
-
 private def invariant (s : RVState) (f : Scan.Frame) : Prop :=
   f.2.mem = s.mem ∧ f.2.x1 = s.x1 ∧ f.2.x2 = s.x2 ∧
   let total := limbOr s.mem s.x11 s.x10.toNat
@@ -51,13 +43,6 @@ private def invariant (s : RVState) (f : Scan.Frame) : Prop :=
       RamRegion f.2.x11 f.2.x10.toNat
   | .p7 => f.2.x5 = total
   | .p8 => f.2.x10 = total
-
-private theorem ret_aligned (x : BitVec 64) :
-    BitVec.extractLsb 0 0 (x &&& 0xfffffffffffffffe#64) = 0#1 := by
-  ext i hi
-  have : i = 0 := by omega
-  subst this
-  simp
 
 private theorem block (s : RVState) (f : Scan.Frame) :
     ⦃invariant s f⦄ Scan.step f ⦃Sum.elim (invariant s) (Post s)⦄ := by
@@ -85,7 +70,7 @@ private theorem block (s : RVState) (f : Scan.Frame) :
     vcgen [Scan.step]
     simp only [invariant, Sum.elim] at *
     obtain ⟨hm, h1, h2, heq, hpos, hr⟩ := ‹_›
-    rw [sub_one _ hpos]
+    rw [toNat_sub_one _ hpos]
     exact ⟨hm, h1, h2, heq, hr⟩
   all_goals vcgen [Scan.step]
   all_goals simp_all [invariant, Sum.elim, Post, ret_aligned, limbOr]

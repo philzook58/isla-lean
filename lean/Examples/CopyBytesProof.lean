@@ -10,9 +10,6 @@ set_option experimental.vcgen true
 
 namespace IslaExamples.CopyBytesProof
 
-def Canonical32 (x : BitVec 64) : Prop := x.toNat < 2 ^ 31 ∨ 2 ^ 64 - 2 ^ 31 ≤ x.toNat
-
-/-- The C loop: copy one byte at a time, front to back, from the current memory. -/
 def copyMem (mem : Memory) (dst src : BitVec 64) : Nat → Memory
   | 0 => mem
   | k + 1 => copyMem (writeLE mem dst 1 (readLE mem src 1)) (dst + 1) (src + 1) k
@@ -27,20 +24,12 @@ def Post (s : RVState) : Exit → Prop
       out.pc = s.x1 &&& ~~~1 ∧ out.x1 = s.x1 ∧ out.x2 = s.x2
   | .stuck _ => False
 
-private theorem ret_aligned (x : BitVec 64) :
-    BitVec.extractLsb 0 0 (x &&& 0xfffffffffffffffe#64) = 0#1 := by
-  ext i hi
-  have : i = 0 := by omega
-  subst this
-  simp
-
 private theorem copyMem_pos (mem : Memory) (d s : BitVec 64) (k : Nat) (h : 0 < k) :
     copyMem mem d s k = copyMem (writeLE mem d 1 (readLE mem s 1)) (d + 1) (s + 1) (k - 1) := by
   cases k with
   | zero => omega
   | succ k => rfl
 
-/-- Bytes left: from the source cursor `a1` to the end pointer `a4`. -/
 def rem (f : CopyBytesO2.Frame) : Nat := f.2.x14.toNat - f.2.x11.toNat
 
 private def invariant (s : RVState) (f : CopyBytesO2.Frame) : Prop :=
@@ -73,10 +62,6 @@ private def invariant (s : RVState) (f : CopyBytesO2.Frame) : Prop :=
       f.2.x10.toNat = dst + (a1 - src) ∧ copyMem f.2.mem f.2.x10 f.2.x11 (rem f) = total
   | .p9 => f.2.mem = total
   | .p10 => f.2.mem = total ∧ f.2.x10 = s.x12
-
-/-- The generated code writes `1#64`; the spec writes `1`. -/
-private theorem sub1_add1 (x : BitVec 64) : x - 1#64 + 1 = x := BitVec.sub_add_cancel x 1
-private theorem add1_sub1 (x : BitVec 64) : x + 1#64 - 1 = x := BitVec.add_sub_cancel x 1
 
 set_option maxHeartbeats 800000 in
 private theorem block (s : RVState) (f : CopyBytesO2.Frame) :

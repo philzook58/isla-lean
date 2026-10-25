@@ -9,7 +9,6 @@ set_option experimental.vcgen true
 
 namespace IslaExamples.FillProof
 
-/-- The memory after storing `v` into `n` consecutive limbs from `p`. -/
 def fillMem (mem : Memory) (p : BitVec 64) (v : BitVec 64) : Nat → Memory
   | 0 => mem
   | n + 1 => fillMem (writeLE mem p 8 v) (p + 8) v n
@@ -24,21 +23,6 @@ private theorem fillMem_pos (mem : Memory) (p v : BitVec 64) (n : Nat) (h : 0 < 
   cases n with
   | zero => omega
   | succ n => rfl
-
-private theorem sub_one (x : BitVec 64) (h : 0 < x.toNat) : (x - 1#64).toNat = x.toNat - 1 := by
-  rw [BitVec.toNat_sub]; simp; omega
-
-private theorem RamRegion.next (h : RamRegion p n) (hn : 0 < n) : RamRegion (p + 8#64) (n - 1) := by
-  unfold RamRegion at *
-  rw [BitVec.toNat_add]; simp
-  omega
-
-private theorem ret_aligned (x : BitVec 64) :
-    BitVec.extractLsb 0 0 (x &&& 0xfffffffffffffffe#64) = 0#1 := by
-  ext i hi
-  have : i = 0 := by omega
-  subst this
-  simp
 
 private def invariant (s : RVState) (f : Fill.Frame) : Prop :=
   f.2.x1 = s.x1 ∧ f.2.x2 = s.x2 ∧ f.2.x12 = s.x12 ∧
@@ -72,7 +56,7 @@ private theorem block (s : RVState) (f : Fill.Frame) :
     vcgen [Fill.step]
     simp only [invariant, Sum.elim] at *
     obtain ⟨h1, h2, h12, heq, hpos, hr⟩ := ‹_›
-    rw [sub_one _ hpos]
+    rw [toNat_sub_one _ hpos]
     exact ⟨h1, h2, h12, heq, hr⟩
   case p2 =>
     vcgen [Fill.step]
