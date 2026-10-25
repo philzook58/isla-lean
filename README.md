@@ -283,3 +283,32 @@ Pitfalls that cost the most time:
 
 `src/isla_lean/configs/riscv64.toml` is derived from `sail_graham`'s config, with PMP pinned off. It
 must match the IR snapshot.
+
+## Status and next steps (October 2026)
+
+**Status.** Everything described above works and is tested:
+- the hand-written pcode-lean corpus and the C corpus at `-O0`/`-O2` all lift and agree with qemu;
+- 19 contracts check with standard axioms only;
+- CI is defined in `.github/workflows/ci.yml` but has not run yet: the repo has no remote.
+
+How this compares with pcode-lean and with Sail's own `--lean` output (x86 experiments, the AF
+bug, why proofs through the whole-ISA interpreter don't scale) is recorded in
+`../sail-lean-compare/README.md`.
+
+**Open threads, roughly in order of value:**
+1. **SLEIGH versus Sail on the same RISC-V code.** Lift the C corpus through both and compare per
+   instruction (sail_graham already does per-instruction comparisons). This answers "is p-code
+   good enough" directly, on code both front ends handle.
+2. **More proofs in cut style:** `isort_u32` (nested loop with stores) and an `-O0` function
+   (stack-resident locals). These test whether `walk` scales.
+3. **Lift speed:** link isla-lib (Rust) or keep one Isla process alive, instead of two model
+   reloads per instruction; drop the `opcode@pc` cache key's PC dependence where the trace allows.
+4. **x86:** build an Isla `x86.ir` with the isla-sail plugin for a head-to-head with pcode-lean's
+   x86 corpus.
+5. **Trust:** a deep embedding (traces as Lean data with one semantics), so `emit.py`-style
+   translation drops out of the trusted base.
+
+**Known gaps:**
+- traps, MMIO and misaligned accesses are `stuck`, not modelled;
+- there is no ELF loader (`check_c.py` loads `.rodata` itself);
+- `-O0` traces (30 MB) are not checked in.
