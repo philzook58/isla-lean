@@ -154,6 +154,9 @@ def main():
         program = ROOT / "lean" / "build" / "NativeCases.lean"
         program.parent.mkdir(exist_ok=True)
         program.write_text(lean_program(rows))
+        # The probes have no proofs, so the default Lake targets do not build them.
+        run(["lake", "build", *(f"Examples.Generated.{m}" for m in sorted(set(MODULES.values())))],
+            cwd=ROOT / "lean", cap=True)
         model = run(["lake", "env", "lean", "--run", program.relative_to(ROOT / "lean")],
                     cwd=ROOT / "lean", cap=True).splitlines()
     assert len(native) == len(model) == len(rows), (len(native), len(model), len(rows))
