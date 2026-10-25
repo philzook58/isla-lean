@@ -289,7 +289,7 @@ must match the IR snapshot.
 **Status.** Everything described above works and is tested:
 - the hand-written pcode-lean corpus and the C corpus at `-O0`/`-O2` all lift and agree with qemu;
 - 19 contracts check with standard axioms only;
-- CI is defined in `.github/workflows/ci.yml` but has not run yet: the repo has no remote.
+- CI (`.github/workflows/ci.yml`) runs pytest, the Lean build and the qemu native check on GitHub.
 
 How this compares with pcode-lean and with Sail's own `--lean` output (x86 experiments, the AF
 bug, why proofs through the whole-ISA interpreter don't scale) is recorded in
