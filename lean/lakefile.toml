@@ -1,0 +1,8 @@
+name = "isla-lean"
+defaultTargets = ["IslaLean", "Examples"]
+
+[[lean_lib]]
+name = "IslaLean"
+
+[[lean_lib]]
+name = "Examples"
