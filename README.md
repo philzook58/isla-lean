@@ -312,3 +312,6 @@ bug, why proofs through the whole-ISA interpreter don't scale) is recorded in
 - traps, MMIO and misaligned accesses are `stuck`, not modelled;
 - there is no ELF loader (`check_c.py` loads `.rodata` itself);
 - `-O0` traces (30 MB) are not checked in.
+
+# AI Disclosure
+An agent was heavily involved in producing this
